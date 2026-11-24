@@ -1,4 +1,5 @@
 pipeline: "nesvor"
+stack_assessment_args: ""
 reconstruction:
   docker: 
     cmd: "docker run --gpus '\"device=0\"' <mount> junshenxu/nesvor:v0.5.0 
@@ -8,7 +9,7 @@ reconstruction:
       --output-volume <output_volume> 
       --output-resolution <output_res>
       --batch-size 4096 
-      --n-levels-bias 1"
+      --n-levels-bias 1 ${...stack_assessment_args}"
   singularity:
     cmd: "singularity exec --bind <singularity_mount> --nv <singularity_path>/nesvor.sif 
       nesvor reconstruct 
@@ -17,7 +18,7 @@ reconstruction:
       --output-volume <output_volume> 
       --output-resolution <output_res>
       --batch-size 4096 
-      --n-levels-bias 1"
+      --n-levels-bias 1 ${...stack_assessment_args}"
   args:
       path_to_output: "nesvor.nii.gz"
 

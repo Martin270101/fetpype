@@ -531,12 +531,11 @@ def create_full_pipeline(cfg, load_masks=False, name="full_pipeline"):
         niu.IdentityInterface(fields=in_fields), name="inputnode"
     )
 
+    output_fields = ["output_srr", "output_seg"]
+    if "surface" in cfg:
+        output_fields += ["output_surf_lh", "output_surf_rh"]
     outputnode = pe.Node(
-        niu.IdentityInterface(
-            fields=["output_srr", "output_seg",
-                    "output_surf_lh", "output_surf_rh"]
-        ),
-        name="outputnode",
+        niu.IdentityInterface(fields=output_fields), name="outputnode"
     )
 
     enabled_cropping = (
@@ -545,8 +544,6 @@ def create_full_pipeline(cfg, load_masks=False, name="full_pipeline"):
     prepro_pipe = get_prepro(cfg, load_masks, enabled_cropping)
     recon = get_recon(cfg)
     segmentation = get_seg(cfg)
-
-    surface = get_surf(cfg)
 
     # PREPROCESSING
     full_fet_pipe.connect(inputnode, "stacks", prepro_pipe, "inputnode.stacks")
@@ -575,18 +572,17 @@ def create_full_pipeline(cfg, load_masks=False, name="full_pipeline"):
         segmentation, "outputnode.seg_volume", outputnode, "output_seg"
     )
 
-    # SURFACE EXTRACTION
-    full_fet_pipe.connect(
-        segmentation, "outputnode.seg_volume", surface, "inputnode.seg_volume"
-    )
-
-    full_fet_pipe.connect(
-        surface, "outputnode.surf_volume_lh", outputnode, "output_surf_lh"
-    )
-
-    full_fet_pipe.connect(
-        surface, "outputnode.surf_volume_rh", outputnode, "output_surf_rh"
-    )
+    if "surface" in cfg:
+        surface = get_surf(cfg)
+        full_fet_pipe.connect(
+            segmentation, "outputnode.seg_volume", surface, "inputnode.seg_volume"
+        )
+        full_fet_pipe.connect(
+            surface, "outputnode.surf_volume_lh", outputnode, "output_surf_lh"
+        )
+        full_fet_pipe.connect(
+            surface, "outputnode.surf_volume_rh", outputnode, "output_surf_rh"
+        )
 
     return full_fet_pipe
 

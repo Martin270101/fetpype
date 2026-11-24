@@ -21,6 +21,7 @@ def run_seg_cmd(
 
     """
     import os
+    from shutil import copyfile
     from fetpype import VALID_SEG_TAGS as VALID_TAGS
     from fetpype.nodes import is_valid_cmd, get_mount_docker
     from fetpype.utils.logging import run_and_tee
@@ -40,8 +41,11 @@ def run_seg_cmd(
     # Avoid mounting problematic directories
     input_srr_dir = os.path.join(os.getcwd(), "seg/input")
     os.makedirs(input_srr_dir, exist_ok=True)
-    os.system(f"cp {input_srr} {input_srr_dir}/input_srr.nii.gz")
-    input_srr = os.path.join(input_srr_dir, "input_srr.nii.gz")
+    staged_input = os.path.join(input_srr_dir, "input_srr.nii.gz")
+    if str(input_srr).endswith(".nii"):
+        staged_input = os.path.join(input_srr_dir, "input_srr.nii")
+    copyfile(input_srr, staged_input)
+    input_srr = staged_input
 
     output_dir = os.path.join(os.getcwd(), "seg/out")
     os.makedirs(output_dir, exist_ok=True)
@@ -53,8 +57,8 @@ def run_seg_cmd(
 
     # Replace the tags in the command
     cmd = cmd.replace("<input_srr>", input_srr)
+    cmd = cmd.replace("<input_volume>", input_srr)
     cmd = cmd.replace("<input_dir>", input_srr_dir)
-    cmd = cmd.replace("<output_seg>", seg)
     if "<output_dir>" in cmd:
         cmd = cmd.replace("<output_dir>", output_dir)
         # Assert that args.path_to_output is defined
@@ -71,6 +75,7 @@ def run_seg_cmd(
             # Remove all extensions (handles both .nii.gz and .nii cases)
             basename_no_ext = basename.split(".")[0]
             seg = seg.replace("<basename>", basename_no_ext)
+    cmd = cmd.replace("<output_seg>", seg)
     if "<mount>" in cmd:
         mount_cmd = get_mount_docker(input_srr_dir, output_dir)
         cmd = cmd.replace("<mount>", mount_cmd)
@@ -91,6 +96,10 @@ def run_seg_cmd(
         # parameter has been set in the config file
         cmd = cmd.replace("<singularity_home>", singularity_home)
 
+    if os.path.isfile(seg):
+        os.unlink(seg)
     run_and_tee(cmd)
+    if not os.path.isfile(seg) or os.path.getsize(seg) == 0:
+        raise RuntimeError(f"Segmentation did not produce an output file: {seg}")
 
     return seg

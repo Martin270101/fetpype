@@ -1,0 +1,11 @@
+defaults:
+  - preprocessing/default
+  - reconstruction/nesvor
+  - reconstruction/postprocessing
+  - segmentation/multibounti
+  - _self_
+container: docker
+reconstruction:
+  output_resolution: 0.5
+  stack_assessment_args: "--metric iqa2d --filter-method none"
+save_graph: false
