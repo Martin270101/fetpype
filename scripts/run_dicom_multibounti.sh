@@ -2,7 +2,8 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: bash $0 DICOM_DIR BIDS_OUT PARTICIPANT [SESSION] DCM2BIDS_CONFIG.json"
+    echo "Usage: bash $0 DICOM_CASE_DIR BIDS_OUT"
+    echo "       bash $0 DICOM_DIR BIDS_OUT PARTICIPANT [SESSION] DCM2BIDS_CONFIG.json"
     echo "       bash $0 --bids-dicom-root SOURCE_ROOT BIDS_OUT PARTICIPANT [SESSION] DCM2BIDS_CONFIG.json"
     echo "       bash $0 --series-rules A|B [--bids-dicom-root] SOURCE BIDS_OUT PARTICIPANT [SESSION]"
 }
@@ -34,6 +35,18 @@ while [[ ${1:-} == --* ]]; do
     esac
 done
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+if ! $bids_source && [[ $# == 2 ]]; then
+    if [[ ! -d "$1" ]]; then
+        echo "DICOM directory not found: $1" >&2
+        exit 2
+    fi
+    source_dir=$(CDPATH= cd -- "$1" && pwd)
+    participant=$(printf '%s' "${source_dir##*/}" | LC_ALL=C tr -cd '[:alnum:]')
+    participant=${participant:-case}
+    series_rules=${series_rules:-B}
+    set -- "$1" "$2" "$participant"
+    echo "Using BIDS participant sub-$participant."
+fi
 if [[ -n "$series_rules" ]]; then
     set -- "$@" "$repo/configs/dcm2bids_selected_t2w.json"
 fi

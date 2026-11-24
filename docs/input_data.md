@@ -56,6 +56,17 @@ for supported inputs and GPU memory.
 ### Header-based series selection
 
 Install the optional DICOM dependency with `python -m pip install -e ".[dicom]"`.
+For one case folder, give the launcher the input and output paths:
+
+```bash
+bash scripts/run_dicom_multibounti.sh /data/dicoms/ID1111 /data/bids_nifti
+```
+
+This uses Variant B and derives the BIDS participant label from the folder
+name. The label keeps ASCII letters and digits and falls back to `case`
+when there are none. `ID1111` produces NIfTI stacks in
+`/data/bids_nifti/sub-ID1111/anat/` without a session.
+
 Use `--series-rules A` for T2-only selection or `--series-rules B` to also
 include eligible bSSFP series. The launcher supplies the Dcm2Bids mapping
 automatically in this mode.

@@ -19,18 +19,22 @@ From a Fetpype checkout, install Fetpype in editable mode with
 Bash, Dcm2Bids 3, dcm2niix, and GPU-enabled Docker.
 
 ```bash
-bash scripts/run_dicom_multibounti.sh --series-rules B --bids-dicom-root \
-  /data/dicom_bids /data/bids_nifti 01 01
+bash scripts/run_dicom_multibounti.sh /data/dicoms/ID1111 /data/bids_nifti
 ```
 
-The launcher finds the DICOMs for `sub-01/ses-01` under the source root or
-its `sourcedata/` directory. It checks the header and applies the series
+Give the launcher the DICOM directory for one case and the BIDS output
+directory. With two paths it derives the participant label from the case
+folder name, keeps only letters and digits, and uses Variant B. For
+`ID1111`, the stacks go into `sub-ID1111/anat/`.
+
+The launcher checks the header and applies the series
 selection rules before Dcm2Bids converts the accepted series to separate
 NIfTI stacks. Variant A selects T2 series. Variant B also admits eligible
 bSSFP series, including WAHNSINN, for joint reconstruction with the T2 stacks.
 The selection report is written to
-`<BIDS_OUT>/tmp_dcm2bids/selection/sub-01_ses-01.json`. For a dataset without
-session directories, omit the session argument.
+`<BIDS_OUT>/tmp_dcm2bids/selection/sub-ID1111.json`. The
+[input guide](docs/input_data.md) also shows how to select a participant
+and optional session from a BIDS-organized DICOM folder tree.
 
 The [Multi-BOUNTI preset](configs/nesvor_multibounti_docker.yaml) prepares the
 stacks and their masks, then reconstructs the brain with NeSVoR at 0.5 mm

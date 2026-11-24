@@ -17,7 +17,10 @@ def find_bash():
 BASH = find_bash()
 
 
-def run_launcher(tmp_path, args, dicom, conversion="stack"):
+def run_launcher(
+    tmp_path, args, dicom, conversion="stack", *,
+    participant="01", selection_report="converted/tmp_dcm2bids/selection/sub-01_ses-02.json",
+):
     launcher = Path(__file__).resolve().parents[1] / "scripts/run_dicom_multibounti.sh"
     (tmp_path / "mapping.json").write_text("{}")
     tools = {
@@ -28,9 +31,9 @@ def run_launcher(tmp_path, args, dicom, conversion="stack"):
 [[ $2 == "$DICOM" ]] || exit 20
 [[ $CONVERSION != failed ]] || exit 22
 if [[ $CONVERSION == stack ]]; then
-    [[ $3 == -p && $4 == 01 ]] || exit 23
-    target=sub-01
-    name=sub-01
+    [[ $3 == -p && $4 == "$PARTICIPANT" ]] || exit 23
+    target="sub-$PARTICIPANT"
+    name="$target"
     if [[ $5 == -s ]]; then
         [[ $6 == 02 ]] || exit 24
         target+=/ses-02
@@ -45,9 +48,9 @@ fi
 ''',
         "python": '''
 [[ $1 == -m && $2 == fetpype.dicom_selection && $3 == B && $4 == "$DICOM" ]] || exit 26
-[[ $5 == converted/tmp_dcm2bids/selection/sub-01_ses-02.json && $6 == -- ]] || exit 27
+[[ $5 == "$SELECTION_REPORT" && $6 == -- ]] || exit 27
 shift 6
-[[ $6 == */configs/dcm2bids_selected_t2w.json ]] || exit 28
+[[ ${@: -3:1} == */configs/dcm2bids_selected_t2w.json ]] || exit 28
 touch selection-called
 dcm2bids -d "$DICOM" "$@"
 ''',
@@ -62,7 +65,8 @@ dcm2bids -d "$DICOM" "$@"
         [BASH, launcher.as_posix(), *args],
         cwd=tmp_path,
         env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
-             "CONVERSION": conversion, "DICOM": dicom},
+             "CONVERSION": conversion, "DICOM": dicom,
+             "PARTICIPANT": participant, "SELECTION_REPORT": selection_report},
         capture_output=True, text=True,
     )
 
@@ -145,3 +149,32 @@ def test_launcher_uses_header_rules_before_running_fetpype(tmp_path):
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "selection-called").is_file()
     assert (tmp_path / "calls").is_file()
+
+
+@pytest.mark.skipif(BASH is None, reason="requires Bash")
+@pytest.mark.parametrize(
+    ("folder", "participant", "options"),
+    [
+        ("ID1111", "ID1111", []),
+        ("Fall 2-1", "Fall21", ["--series-rules", "B"]),
+    ],
+)
+def test_direct_import_needs_only_input_and_output_folders(
+    tmp_path, folder, participant, options
+):
+    (tmp_path / folder).mkdir()
+    subject = f"sub-{participant}"
+    result = run_launcher(
+        tmp_path, [*options, folder, "converted"], folder,
+        participant=participant,
+        selection_report=f"converted/tmp_dcm2bids/selection/{subject}.json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "selection-called").is_file()
+    assert (tmp_path / f"converted/{subject}/anat/{subject}_run-1_T2w.nii.gz").is_file()
+    args = (tmp_path / "calls").read_text().splitlines()
+    assert args[:-1] == [
+        "--data", "converted", "--out", "converted",
+        "--subjects", participant, "--config",
+    ]
