@@ -12,11 +12,55 @@ It aims at making easy the integration of a variety of tools existing to process
 
 More information are available on the [documentation](https://fetpype.github.io/fetpype/).
 
-## DICOM to NeSVoR and SVRTK Multi-BOUNTI
+## Optional add-on for DICOM import and SVRTK Multi-BOUNTI
 
-From a Fetpype checkout, install Fetpype in editable mode with
-`python -m pip install -e ".[dicom]"`. Run the launcher in a Linux environment with
-Bash, Dcm2Bids 3, dcm2niix, and GPU-enabled Docker.
+This fork adds an optional launcher for DICOM import, NeSVoR reconstruction
+at 0.5 mm, SVRTK Multi-BOUNTI segmentation, and ODS batch reporting. Start
+the add-on through `scripts/run_dicom_multibounti.sh` or select its preset
+explicitly for existing BIDS-NIfTI data. The standard Fetpype workflow and
+presets are described in the [Fetpype documentation](https://fetpype.github.io/fetpype/).
+
+### Install the add-on
+
+Use Bash on Linux with GPU-enabled Docker. Set up the Python
+environment once on the machine where the pipeline will run.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dicom]" "dcm2bids>=3,<4" dcm2niix
+```
+
+Activate the environment again when you open a new shell.
+
+### Check Docker GPU access
+
+The preset launches the reconstruction and segmentation containers for
+you. Docker downloads their images on first use if they are missing from
+the local cache. [Docker image pull behavior](https://docs.docker.com/reference/cli/docker/container/run/#pull)
+
+On the Linux GPU host, run these checks from the account you will use
+for Fetpype.
+
+```bash
+nvidia-smi -L
+docker info >/dev/null
+docker run --rm --gpus all ubuntu nvidia-smi
+```
+
+The first command checks that Linux can see the NVIDIA GPU. The second
+checks that your account can reach the Docker daemon. If the final
+command lists a GPU, Docker can pass it into a container and you can start
+the add-on. [Docker GPU access](https://docs.docker.com/engine/containers/gpu/)
+
+If the host sees the GPU and Docker is reachable but the container test
+fails, give the error output to the server administrator. On a standard
+Linux Docker installation, an administrator installs the NVIDIA Container
+Toolkit for the distribution, configures the Docker runtime, and restarts
+Docker. Rootless Docker has its own configuration steps.
+[NVIDIA Container Toolkit for Linux](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-docker)
+
+### Run one examination
 
 ```bash
 bash scripts/run_dicom_multibounti.sh /data/dicoms/ID1111 /data/bids_nifti
@@ -26,6 +70,10 @@ Give the launcher the DICOM directory for one case and the BIDS output
 directory. With two paths it derives the participant label from the case
 folder name, keeps only letters and digits, and uses Variant B. For
 `ID1111`, the stacks go into `sub-ID1111/anat/`.
+
+For `FetalVienna000001/20250612`, pass the date directory as the input.
+The launcher uses the parent directory as the participant and the date as
+the session, yielding `sub-FetalVienna000001/ses-20250612/anat/`.
 
 The launcher checks the header and applies the series
 selection rules before Dcm2Bids converts the accepted series to separate
@@ -53,20 +101,51 @@ fetpype_run --data /data/bids_nifti --out /data/bids_nifti \
   --subjects 01 --sessions 01 --config configs/nesvor_multibounti_docker.yaml
 ```
 
+### Startup modes with an ODS report
+
+Use a mode as the first option. `--single` takes one MRT date folder.
+`--all` and `--range` take the root containing the `FetalVienna...`
+person folders.
+
+```bash
+bash scripts/run_dicom_multibounti.sh --single /data/dicoms/FetalVienna000001/20250612 /data/bids_nifti
+bash scripts/run_dicom_multibounti.sh --all /data/dicoms /data/bids_nifti
+bash scripts/run_dicom_multibounti.sh --range 000001 000020 /data/dicoms /data/bids_nifti
+```
+
+The range is inclusive. Bounds can also be entered as `1 20` or as complete
+IDs such as `FetalVienna000001 FetalVienna000020`. Missing IDs in the report
+use the digit width most common in the source root, with six digits as
+the default. Every dated examination is processed separately
+with Variant B by default. Add `--series-rules A` after the mode to select
+Variant A. Use separate output roots when comparing variants.
+
+The launcher writes the ODS file directly into the results directory at
+`<BIDS_OUT>/derivatives/nesvor_multibounti/fetpype-<run>-report.ods`.
+Per-exam logs are saved under `<BIDS_OUT>/reports/fetpype-<run>/`.
+The report contains summary
+counts and one row per examination or missing entry, including the outcome,
+selected series, missing orientations in the accepted DICOM headers,
+output-file checks, and paths to the logs and selection reports. A failed
+exam is recorded and processing continues. Complete results are reused.
+Existing BIDS stacks can be used to resume incomplete reconstructions or
+segmentations. A batch with missing or failed entries returns exit code 1
+after writing the report.
+
 ### Run the workflow tests
 
 Run these commands from the checkout root.
 
 ```bash
 python -m pip install -e ".[dev,dicom]"
-python -m pytest -q tests/test_dicom_selection.py tests/test_dicom_launcher.py tests/test_multibounti.py
+python -m pytest -q tests/test_dicom_selection.py tests/test_dicom_launcher.py tests/test_dicom_batch.py tests/test_multibounti.py
 ```
 
 The focused tests cover header-based series selection, forwarding T2 and
-bSSFP together, DICOM import, the NeSVoR quality options and stack forwarding,
-and Multi-BOUNTI output handling. They use synthetic headers and substitute
-test commands for the external tools. For the full suite, install Graphviz
-(`dot`) and run `python -m pytest -q`.
+bSSFP together, DICOM import, NeSVoR quality options, Multi-BOUNTI output
+handling, and the batch ODS report. They use synthetic headers and
+substitute test commands for the external tools. For the full suite,
+install Graphviz (`dot`) and run `python -m pytest -q`.
 
 # Reference
 If you use `Fetpype` in your research, please cite the following paper:

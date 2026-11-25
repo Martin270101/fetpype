@@ -19,7 +19,8 @@ BASH = find_bash()
 
 def run_launcher(
     tmp_path, args, dicom, conversion="stack", *,
-    participant="01", selection_report="converted/tmp_dcm2bids/selection/sub-01_ses-02.json",
+    participant="01", session="02",
+    selection_report="converted/tmp_dcm2bids/selection/sub-01_ses-02.json",
 ):
     launcher = Path(__file__).resolve().parents[1] / "scripts/run_dicom_multibounti.sh"
     (tmp_path / "mapping.json").write_text("{}")
@@ -35,9 +36,9 @@ if [[ $CONVERSION == stack ]]; then
     target="sub-$PARTICIPANT"
     name="$target"
     if [[ $5 == -s ]]; then
-        [[ $6 == 02 ]] || exit 24
-        target+=/ses-02
-        name+=_ses-02
+        [[ $6 == "$SESSION" ]] || exit 24
+        target+="/ses-$SESSION"
+        name+="_ses-$SESSION"
         shift 2
     fi
     [[ $5 == -c && $7 == -o ]] || exit 25
@@ -47,6 +48,10 @@ if [[ $CONVERSION == stack ]]; then
 fi
 ''',
         "python": '''
+if [[ $1 == -m && $2 == fetpype.dicom_batch ]]; then
+    printf "%s\\n" "$@" > batch-called
+    exit 0
+fi
 [[ $1 == -m && $2 == fetpype.dicom_selection && $3 == B && $4 == "$DICOM" ]] || exit 26
 [[ $5 == "$SELECTION_REPORT" && $6 == -- ]] || exit 27
 shift 6
@@ -66,7 +71,8 @@ dcm2bids -d "$DICOM" "$@"
         cwd=tmp_path,
         env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
              "CONVERSION": conversion, "DICOM": dicom,
-             "PARTICIPANT": participant, "SELECTION_REPORT": selection_report},
+             "PARTICIPANT": participant, "SESSION": session,
+             "SELECTION_REPORT": selection_report},
         capture_output=True, text=True,
     )
 
@@ -178,3 +184,36 @@ def test_direct_import_needs_only_input_and_output_folders(
         "--data", "converted", "--out", "converted",
         "--subjects", participant, "--config",
     ]
+
+
+@pytest.mark.skipif(BASH is None, reason="requires Bash")
+def test_dated_fetal_vienna_folder_supplies_participant_and_session(tmp_path):
+    dicom = "Fetale MRTs/FetalVienna000001/20250612"
+    (tmp_path / dicom).mkdir(parents=True)
+    result = run_launcher(
+        tmp_path, [dicom, "converted"], dicom,
+        participant="FetalVienna000001",
+        session="20250612",
+        selection_report="converted/tmp_dcm2bids/selection/sub-FetalVienna000001_ses-20250612.json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    anat = tmp_path / "converted/sub-FetalVienna000001/ses-20250612/anat"
+    assert (anat / "sub-FetalVienna000001_ses-20250612_run-1_T2w.nii.gz").is_file()
+    args = (tmp_path / "calls").read_text().splitlines()
+    assert args[:-1] == [
+        "--data", "converted", "--out", "converted",
+        "--subjects", "FetalVienna000001", "--sessions", "20250612", "--config",
+    ]
+
+
+@pytest.mark.skipif(BASH is None, reason="requires Bash")
+def test_launcher_dispatches_batch_mode(tmp_path):
+    options = ["--range", "00001", "00020", "Fetale MRTs", "converted"]
+    result = run_launcher(tmp_path, options, "Fetale MRTs")
+
+    assert result.returncode == 0, result.stderr
+    args = (tmp_path / "batch-called").read_text().splitlines()
+    assert args[:3] == ["-m", "fetpype.dicom_batch", "--launcher"]
+    assert args[3].endswith("/scripts/run_dicom_multibounti.sh")
+    assert args[4:] == options

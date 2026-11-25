@@ -44,14 +44,20 @@ The following entities are supported:
 
 There are several tools that can be used to convert DICOM to BIDS. We recommend using [dcm2bids](https://github.com/dcm2bids/dcm2bids). Other options are to use [dcm2niix](https://github.com/rordenlab/dcm2niix) to create the nifti files and then convert the files to BIDS
 
-### DICOM to NeSVoR and SVRTK Multi-BOUNTI
+### Optional add-on for DICOM import and SVRTK Multi-BOUNTI
 
-Run this workflow from a Fetpype checkout in a Linux environment with Bash,
-Dcm2Bids 3, dcm2niix, and GPU-enabled Docker. Install Fetpype in editable mode
+This fork provides an optional launcher for DICOM import, reconstruction,
+segmentation, and ODS batch reporting. Run the add-on from a Fetpype checkout
+on Linux with Bash, Dcm2Bids 3, dcm2niix, and GPU-enabled Docker.
+Install Fetpype in editable mode
 so that `fetpype_run` is available. Use a BIDS output path without spaces for
 Fetpype's container bind mounts. See the
 [SVRTK requirements](https://github.com/SVRTK/perinatal-brain-mri-analysis#auto-processing-scripts)
 for supported inputs and GPU memory.
+
+Fetpype starts the containers when the preset runs. On a Linux GPU host,
+`docker run --rm --gpus all ubuntu nvidia-smi` checks container access
+from your account. [Docker GPU access on Linux](https://docs.docker.com/engine/containers/gpu/)
 
 ### Header-based series selection
 
@@ -66,6 +72,12 @@ This uses Variant B and derives the BIDS participant label from the folder
 name. The label keeps ASCII letters and digits and falls back to `case`
 when there are none. `ID1111` produces NIfTI stacks in
 `/data/bids_nifti/sub-ID1111/anat/` without a session.
+
+For the `FetalVienna<digits>/<date>/` layout, point the same two-path
+command at the date folder with the DICOMs. The parent folder provides the
+participant label and the date folder provides the session label. A date
+folder named `20250612` under `FetalVienna000001` produces
+`sub-FetalVienna000001/ses-20250612/anat/`.
 
 Use `--series-rules A` for T2-only selection or `--series-rules B` to also
 include eligible bSSFP series. The launcher supplies the Dcm2Bids mapping

@@ -3,6 +3,9 @@ set -euo pipefail
 
 usage() {
     echo "Usage: bash $0 DICOM_CASE_DIR BIDS_OUT"
+    echo "       bash $0 --single DICOM_CASE_DIR BIDS_OUT"
+    echo "       bash $0 --all FETAL_VIENNA_ROOT BIDS_OUT"
+    echo "       bash $0 --range FIRST_ID LAST_ID FETAL_VIENNA_ROOT BIDS_OUT"
     echo "       bash $0 DICOM_DIR BIDS_OUT PARTICIPANT [SESSION] DCM2BIDS_CONFIG.json"
     echo "       bash $0 --bids-dicom-root SOURCE_ROOT BIDS_OUT PARTICIPANT [SESSION] DCM2BIDS_CONFIG.json"
     echo "       bash $0 --series-rules A|B [--bids-dicom-root] SOURCE BIDS_OUT PARTICIPANT [SESSION]"
@@ -12,6 +15,12 @@ if [[ ${1:-} == --help || ${1:-} == -h ]]; then
     usage
     exit 0
 fi
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+case "${1:-}" in
+    --single|--all|--range)
+        exec python -m fetpype.dicom_batch --launcher "$repo/scripts/run_dicom_multibounti.sh" "$@"
+        ;;
+esac
 bids_source=false
 series_rules=
 while [[ ${1:-} == --* ]]; do
@@ -34,18 +43,24 @@ while [[ ${1:-} == --* ]]; do
             ;;
     esac
 done
-repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if ! $bids_source && [[ $# == 2 ]]; then
     if [[ ! -d "$1" ]]; then
         echo "DICOM directory not found: $1" >&2
         exit 2
     fi
     source_dir=$(CDPATH= cd -- "$1" && pwd)
-    participant=$(printf '%s' "${source_dir##*/}" | LC_ALL=C tr -cd '[:alnum:]')
-    participant=${participant:-case}
+    parent_dir=${source_dir%/*}
+    parent=${parent_dir##*/}
+    folder_label=$(printf '%s' "${source_dir##*/}" | LC_ALL=C tr -cd '[:alnum:]')
     series_rules=${series_rules:-B}
-    set -- "$1" "$2" "$participant"
-    echo "Using BIDS participant sub-$participant."
+    if [[ ${parent,,} =~ ^fetalvienna[0-9]+$ && -n "$folder_label" ]]; then
+        set -- "$1" "$2" "$parent" "$folder_label"
+        echo "Using BIDS participant sub-$parent, session ses-$folder_label."
+    else
+        participant=${folder_label:-case}
+        set -- "$1" "$2" "$participant"
+        echo "Using BIDS participant sub-$participant."
+    fi
 fi
 if [[ -n "$series_rules" ]]; then
     set -- "$@" "$repo/configs/dcm2bids_selected_t2w.json"

@@ -1,3 +1,4 @@
+import re
 import shlex
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import pytest
 from fetpype.nodes.reconstruction import run_recon_cmd
 from fetpype.nodes.segmentation import run_seg_cmd
 from fetpype.pipelines.full_pipeline import create_full_pipeline, get_recon
+from fetpype.utils.utils_bids import create_bids_datasink
 from fetpype.workflows.utils import check_valid_pipeline, init_and_load_cfg
 
 
@@ -19,6 +21,21 @@ def test_multibounti_workflow():
     workflow = create_full_pipeline(cfg)
     assert workflow.get_node("Segmentation.multibounti") is not None
     assert "SurfaceExtraction" not in workflow.list_node_names()
+
+
+def test_multibounti_segmentation_has_bids_derivative_name(tmp_path):
+    output = (tmp_path / "derivatives/nesvor_multibounti").as_posix()
+    sink = create_bids_datasink(
+        out_dir=output, pipeline_name="nesvor_multibounti",
+        strip_dir=tmp_path.as_posix(), rec_label="nesvor", seg_label="multibounti",
+    )
+    saved = f"{output}/_session_20250612_subject_FetalVienna00001/seg.nii.gz"
+    for pattern, replacement in sink.inputs.regexp_substitutions:
+        saved = re.sub(pattern, replacement, saved)
+    assert saved == (
+        f"{output}/sub-FetalVienna00001/ses-20250612/anat/"
+        "sub-FetalVienna00001_ses-20250612_rec-nesvor_seg-multibounti_dseg.nii.gz"
+    )
 
 
 @pytest.mark.parametrize(

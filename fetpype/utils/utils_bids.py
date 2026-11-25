@@ -330,6 +330,7 @@ def create_bids_datasink(
 
     # ** Rule 4: Segmentation Output **
     if seg_label and rec_label and pipeline_name != "preprocessing":
+        input_stem = "seg" if seg_label == "multibounti" else "input_srr-mask-brain_bounti-19"
         # with session and with acquisition
         regex_subs.append(
             (
@@ -337,7 +338,7 @@ def create_bids_datasink(
                     rf"^{escaped_bids_derivatives_root}/"
                     rf".*?_?acquisition_([^/]+)_session_([^/]+)"
                     rf"_subject_([^/]+).*/"
-                    rf"input_srr-mask-brain_bounti-19(\.nii(?:\.gz)?)$"
+                    rf"{input_stem}(\.nii(?:\.gz)?)$"
                 ),
                 (
                     rf"{bids_derivatives_root}/sub-\3/ses-\2/{datatype}/"
@@ -353,7 +354,7 @@ def create_bids_datasink(
                     rf"^{escaped_bids_derivatives_root}/"
                     rf"(?!.*?_?acquisition_[^/]+)"
                     rf".*?_?session_([^/]+)_subject_([^/]+).*/"
-                    rf"input_srr-mask-brain_bounti-19(\.nii(?:\.gz)?)$"
+                    rf"{input_stem}(\.nii(?:\.gz)?)$"
                 ),
                 (
                     rf"{bids_derivatives_root}/sub-\2/ses-\1/{datatype}/"
@@ -368,7 +369,7 @@ def create_bids_datasink(
                     rf"^{escaped_bids_derivatives_root}/"
                     rf"(?!.*?_?session_[^/]+)"
                     rf".*?_?acquisition_([^/]+)_subject_([^/]+).*/"
-                    rf"input_srr-mask-brain_bounti-19(\.nii(?:\.gz)?)$"
+                    rf"{input_stem}(\.nii(?:\.gz)?)$"
                 ),
                 (
                     rf"{bids_derivatives_root}/sub-\2/{datatype}/"
@@ -383,7 +384,7 @@ def create_bids_datasink(
                     rf"^{escaped_bids_derivatives_root}/"
                     rf"(?!.*?_?acquisition_[^/]+)(?!.*?_?session_[^/]+)"
                     rf".*?_?subject_([^/]+).*/"
-                    rf"input_srr-mask-brain_bounti-19(\.nii(?:\.gz)?)$"
+                    rf"{input_stem}(\.nii(?:\.gz)?)$"
                 ),
                 (
                     rf"{bids_derivatives_root}/sub-\1/{datatype}/"

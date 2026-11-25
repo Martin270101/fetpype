@@ -20,7 +20,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dicom = [
-    "pydicom>=3.0"
+    "pydicom>=3.0",
+    "odfpy>=1.4.1"
 ]
 dev = [
     "pytest>=7.0"
